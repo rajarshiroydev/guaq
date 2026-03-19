@@ -608,9 +608,13 @@ const App: React.FC = () => {
 
   const fetchTickets = async (): Promise<void> => {
     try {
-      await fetch(`${API_BASE_URL}/api/telegram/sync`, {
-        method: "POST",
-      });
+      try {
+        await fetch(`${API_BASE_URL}/api/telegram/sync`, {
+          method: "POST",
+        });
+      } catch (syncError) {
+        console.error("Telegram sync unavailable:", syncError);
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/tickets`);
       if (!response.ok) {

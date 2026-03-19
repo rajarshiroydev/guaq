@@ -1,4 +1,4 @@
-import { TicketPriority, TicketStatus } from "@prisma/client";
+import { Prisma, TicketPriority, TicketStatus } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
@@ -89,5 +89,21 @@ ticketsRouter.patch("/:id", async (req, res, next) => {
 });
 
 ticketsRouter.delete("/:id", async (req, res, next) => {
-  return next(new ApiError("Ticket deletion is disabled in this build", 405));
+  try {
+    const ticketId = req.params.id;
+    if (!ticketId) {
+      throw new ApiError("Ticket id is required", 400);
+    }
+
+    await prisma.ticket.delete({ where: { id: ticketId } });
+    res.status(204).send();
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return next(new ApiError("Ticket not found", 404));
+    }
+    next(error);
+  }
 });

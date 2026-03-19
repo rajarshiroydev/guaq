@@ -42,6 +42,9 @@ interface TicketsProps {
   staffList: StaffMember[];
 }
 
+const API_BASE_URL =
+  import.meta.env?.VITE_API_BASE_URL || "http://localhost:8080";
+
 const Tickets: React.FC<TicketsProps> = ({
   tickets,
   onTicketUpdate,
@@ -65,8 +68,29 @@ const Tickets: React.FC<TicketsProps> = ({
     onTicketUpdate(updatedTickets);
   };
 
-  const handleDelete = () => {
-    alert("Ticket deletion is disabled in this build.");
+  const handleDelete = async () => {
+    if (!selectedTicket) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/tickets/${selectedTicket.id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete ticket (${response.status})`);
+      }
+
+      onTicketUpdate(tickets.filter((t) => t.id !== selectedTicket.id));
+      setSelectedTicket(null);
+    } catch (error) {
+      console.error("Failed to delete ticket:", error);
+      alert("Failed to delete ticket. Please try again.");
+    }
   };
 
   const handleCreate = () => {
@@ -376,7 +400,7 @@ const Tickets: React.FC<TicketsProps> = ({
                 onClick={() => handleDelete()}
                 className="text-rose-400 hover:text-rose-300 text-sm flex items-center gap-2 px-3 py-2 rounded hover:bg-rose-400/10 transition"
               >
-                <Trash2 size={16} /> Delete Disabled
+                <Trash2 size={16} /> Delete Ticket
               </button>
               <button
                 onClick={() => setSelectedTicket(null)}
