@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TicketStatus {
+  New
+  InProgress
+  Resolved
+}
+
+enum TicketPriority {
+  Low
+  Medium
+  High
+  Critical
+}
+
+enum ReviewStatus {
+  Pending
+  Replied
+}
+
+enum BookingStatus {
+  Pending
+  Confirmed
+  CheckedIn
+  CheckedOut
+  Cancelled
+  NoShow
+}
+
+enum ChatSender {
+  user
+  bot
+  system
+}
+
+model StaffMember {
+  id           String   @id
+  name         String
+  role         String
+  email        String   @unique
+  phone        String
+  currentShift String
+  isOnDuty     Boolean  @default(false)
+  avatarBg     String?
+  tickets      Ticket[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Ticket {
+  id          String       @id
+  roomId      String
+  guestName   String
+  category    String
+  description String
+  status      TicketStatus @default(New)
+  priority    TicketPriority
+  assignedTo  String?
+  assignee    StaffMember? @relation(fields: [assignedTo], references: [id])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Review {
+  id        String       @id
+  guestName String
+  rating    Int
+  date      DateTime
+  platform  String
+  comment   String
+  response  String?
+  status    ReviewStatus @default(Pending)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Alert {
+  id        Int      @id
+  userId    Int
+  type      String
+  msg       String
+  time      String
+  createdAt DateTime @default(now())
+}
+
+model Conversation {
+  id                Int       @id @default(autoincrement())
+  telegramChatId    BigInt    @unique
+  telegramUsername  String?
+  guestName         String
+  phone             String?
+  status            String    @default("online")
+  avatarBg          String    @default("bg-indigo-600")
+  lastMsg           String?
+  unread            Int       @default(0)
+  assignedTo        String?
+  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime  @default(now())
+  messages          Message[]
+}
+
+model Message {
+  id             String       @id
+  conversationId Int
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         ChatSender
+  text           String
+  status         String?
+  isMedia        Boolean      @default(false)
+  mediaUrl       String?
+  timestamp      DateTime
+}
+
+model RoomBooking {
+  id         String        @id
+  roomId     String
+  guestName  String
+  guestPhone String?
+  guestEmail String?
+  checkIn    DateTime
+  checkOut   DateTime
+  adults     Int           @default(1)
+  children   Int           @default(0)
+  status     BookingStatus @default(Confirmed)
+  source     String        @default("direct")
+  totalAmount Float
+  paidAmount Float         @default(0)
+  notes      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
