@@ -469,6 +469,11 @@ const toUiStatus = (status: BackendTicketStatus): Ticket["status"] => {
   return status;
 };
 
+const toBackendStatus = (status: Ticket["status"]): BackendTicketStatus => {
+  if (status === "In Progress") return "InProgress";
+  return status;
+};
+
 const toUiTicket = (ticket: BackendTicket): Ticket => ({
   id: ticket.id,
   roomId: ticket.roomId,
@@ -561,7 +566,9 @@ const App: React.FC = () => {
 
   // Global State (Replaces Database in this Prototype)
   const [staffList, setStaffList] = useState<StaffMember[]>(initialStaffList);
-  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
+  const [tickets, setTickets] = useState<Ticket[]>(
+    import.meta.env.DEV ? initialTickets : [],
+  );
   const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
   const [systemAccounts, setSystemAccounts] =
     useState<SystemAccount[]>(initialAccounts);
@@ -599,35 +606,38 @@ const App: React.FC = () => {
   ]);
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
 
+  const fetchTickets = async (): Promise<void> => {
+    try {
+      await fetch(`${API_BASE_URL}/api/telegram/sync`, {
+        method: "POST",
+      });
+
+      const response = await fetch(`${API_BASE_URL}/api/tickets`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tickets (${response.status})`);
+      }
+      const data = (await response.json()) as BackendTicket[];
+      setTickets(data.map(toUiTicket));
+    } catch (error) {
+      console.error("Tickets API unavailable:", error);
+      if (!import.meta.env.DEV) {
+        setTickets([]);
+      }
+    }
+  };
+
   useEffect(() => {
     let disposed = false;
 
-    const fetchTickets = async () => {
-      try {
-        await fetch(`${API_BASE_URL}/api/telegram/sync`, {
-          method: "POST",
-        });
-
-        const response = await fetch(`${API_BASE_URL}/api/tickets`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch tickets");
-        }
-        const data = (await response.json()) as BackendTicket[];
-        if (!disposed && data.length > 0) {
-          setTickets(data.map(toUiTicket));
-        }
-      } catch (error) {
-        if (!disposed) {
-          console.error(
-            "Tickets API unavailable, using local defaults:",
-            error,
-          );
-        }
+    const fetchTicketsSafely = async () => {
+      if (disposed) {
+        return;
       }
+      await fetchTickets();
     };
 
-    fetchTickets();
-    const intervalId = window.setInterval(fetchTickets, 5000);
+    fetchTicketsSafely();
+    const intervalId = window.setInterval(fetchTicketsSafely, 5000);
 
     return () => {
       disposed = true;
@@ -665,10 +675,19 @@ const App: React.FC = () => {
       await fetch(`${API_BASE_URL}/api/tickets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newTicket),
+        body: JSON.stringify({
+          id: newTicket.id,
+          roomId: newTicket.roomId,
+          guestName: newTicket.guestName,
+          category: newTicket.category,
+          description: newTicket.description,
+          status: toBackendStatus(newTicket.status),
+          priority: newTicket.priority,
+          assignedTo: newTicket.assignedTo,
+        }),
       });
       // Optionally trigger a fetch to get the real ticket with a proper DB ID
-      fetchTickets();
+      await fetchTickets();
     } catch (err) {
       console.error("Failed to create ticket on backend:", err);
     }
